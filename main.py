@@ -41,8 +41,9 @@ class Main(commands.Bot):
     async def setup_hook(self):
         try:
             self.db_pool = await asyncpg.create_pool(database_url)
+            self.dblogger.info("Database pool created successfully.")
         except Exception as e:
-            self.dblogger.exception("Failed to create database pool: {e}")
+            self.dblogger.exception(f"Failed to create database pool: {e}")
             raise
 
         try:
@@ -67,6 +68,13 @@ async def on_ready():
     bot.botlogger.info(f"> Logged in as {bot.user} (ID: {bot.user.id})")
     bot.botlogger.info("────────────────────────────────")
 
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        return
+    
+    raise error
+
 @bot.command(aliases=['r'])
 @commands.is_owner()
 async def reload(ctx):
@@ -78,7 +86,7 @@ async def reload(ctx):
                 await ctx.send(f"Successfully reloaded `cogs.{extension}`.")
                 bot.botlogger.info(f"Successfully reloaded `cogs.{extension}`.")
     except Exception as e:
-        await ctx.send(f"Error reloading extension. Check terminal for details.")
+        await ctx.send(f"Error reloading extension `cogs.{extension}`. Check terminal for details.")
         bot.botlogger.error(f"Error occurred while reloading extension: {e}")
 
 bot.run(token)
