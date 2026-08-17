@@ -1,7 +1,9 @@
+import logging
 import discord
 from discord.ext import commands
-import asyncpg
 from core import db
+
+dblogger = logging.getLogger("database")
 
 class fetchUser(commands.Converter):
     async def convert(self, ctx, argument):
@@ -20,9 +22,14 @@ class RPG(commands.Cog):
     # start
     @commands.command()
     async def start(self, ctx):
-        userid = ctx.author.id
+        user = ctx.author
 
-        response = await db._new_player(ctx, userid)
+        response, db_error = await db._new_player(user)
+
+        if db_error:
+            await ctx.send("Something went wrong. Please try again later.")
+            dblogger.exception(f"Error fetching player for user {user.id} during stat calculation.")
+            return
 
         if response:
             await ctx.send(f"Welcome, {ctx.author.mention}! Your adventure begins now.")
@@ -36,6 +43,7 @@ class RPG(commands.Cog):
         player, db_error = await db._fetch_player(ctx, user)
 
         if db_error:
+            await ctx.send("Something went wrong. Please try again later.")
             return
 
         if player:
@@ -78,6 +86,7 @@ class RPG(commands.Cog):
         player, db_error = await db._fetch_player(ctx, user)
 
         if db_error:
+            await ctx.send("Something went wrong. Please try again later.")
             return
 
         if player:
