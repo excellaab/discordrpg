@@ -15,10 +15,7 @@ async def _new_player(user):
                 ON CONFLICT (user_id) DO NOTHING
                 RETURNING user_id;
             ''', userid)
-
-            # TODO: remove this in production
-            dblogger.info(f"Registering user {user.name} with userID {userid}.")
-
+            
             return response, False
     except asyncpg.UndefinedTableError as e:
         dblogger.exception(f"Missing DB table while registering user {userid}: {e}")
@@ -34,9 +31,6 @@ async def _fetch_player(user):
     try:
         async with dbpool.acquire() as conn:
             player = await conn.fetchrow('SELECT * FROM players WHERE user_id = $1', user.id)
-
-            # TODO: remove this in production
-            dblogger.info(f"Fetching profile for user {user.name} with id {user.id}.")
             return player, False
     except asyncpg.UndefinedTableError as e:
         dblogger.exception(f"Missing DB table while fetching profile for user {user.id}: {e}")
