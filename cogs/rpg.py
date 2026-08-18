@@ -54,10 +54,10 @@ async def _build_combat_embed(bot, user, player, created_at):
     combatembed.set_author(name = "Profile/Combat", icon_url = bot.user.avatar.url)
 
     combatembed.add_field(name = "ACTV", value = f"""
-        **HP**: {player['health']}/{await statcalc.maxhp(user)}
-        **DEF**: {await statcalc.defense(user)}
-        **MANA**: {player['mana']}/{await statcalc.maxmana(user)}
-        **STAM**: {player['stamina']}
+        **HP**: {player['health']:.1f}/{await statcalc.maxhp(user):.1f}
+        **DEF**: {await statcalc.defense(user):.1f}
+        **MANA**: {player['mana']:.1f}/{await statcalc.maxmana(user):.1f}
+        **STAM**: {player['stamina']:.1f}
     """, inline = False)
     combatembed.add_field(name = "PASV", value = f"""
         **CRIT**: {await statcalc.crit_chance(user) * 100:.2f}%
@@ -167,7 +167,6 @@ class RPG(commands.Cog):
             await ctx.send(f"{user.mention}, hasn't started an adventure yet! Use `!start` to begin.")
 
     # profile: combat
-    # NOTE: not working yet, resolved later; do NOT start the bot
     @commands.command(aliases=['pc'])
     async def pcombat(self, ctx, query: fetchUser | None = None):
         user = query if query else ctx.author
