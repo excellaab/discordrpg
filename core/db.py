@@ -2,10 +2,9 @@ import logging
 import asyncpg
 
 dblogger = logging.getLogger("database")
-
 dbpool: asyncpg.Pool = None
 
-async def _new_player(user):
+async def new_player(user):
     userid = user.id
     try:
         async with dbpool.acquire() as conn:
@@ -27,7 +26,26 @@ async def _new_player(user):
         dblogger.exception(f"DB error registering user {userid}: {e}")
         return None, True
 
-async def _fetch_player(user):
+async def set_class(user, class_name):
+    try:
+        async with dbpool.acquire() as conn:
+            await conn.execute('''
+                UPDATE players 
+                SET class = $1 
+                WHERE user_id = $2
+            ''', class_name, user.id)
+    except asyncpg.UndefinedTableError as e:
+            dblogger.exception(f"Missing DB table while setting class for user {user.id}: {e}")
+            return None, True
+    except asyncpg.UndefinedColumnError as e:
+        dblogger.exception(f"Missing DB column while setting class for user {user.id}: {e}")
+        return None, True
+    except Exception as e:
+        dblogger.exception(f"DB error setting class for user {user.id}: {e}")
+        return True
+    return False
+
+async def fetch_player(user):
     try:
         async with dbpool.acquire() as conn:
             player = await conn.fetchrow('SELECT * FROM players WHERE user_id = $1', user.id)
@@ -42,7 +60,7 @@ async def _fetch_player(user):
         dblogger.exception(f"DB error fetching profile for user {user.id}: {e}")
         return None, True
 
-async def _fetch_equipped_armor(user):
+async def fetch_equipped_armor(user):
     try:
         async with dbpool.acquire() as conn:
             armor = await conn.fetchrow('''

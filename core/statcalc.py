@@ -1,6 +1,7 @@
 import logging
 import json
 import math
+import inspect
 from functools import wraps
 from . import db
 
@@ -9,29 +10,42 @@ dblogger = logging.getLogger("database")
 def fetchplayer(func):
     @wraps(func)
     async def wrapper(user, *args, **kwargs):
-        player, db_error = await db._fetch_player(user)
+        sig = inspect.signature(func)
+        needs_player = 'player' in sig.parameters
+        needs_armor = 'armor_data' in sig.parameters
+        needs_class = 'class_name' in sig.parameters
         
-        if db_error:
-            # Handle the error centrally (e.g., log it, return a default)
-            dblogger.exception(f"Error fetching player for user {user.id} during stat calculation.")
-            return None
+        player = None
+        if needs_player or needs_class:
+            player, db_error = await db.fetch_player(user)
+            if db_error:
+                dblogger.exception(f"Error fetching player for user {user.id} during stat calculation.")
+                return None
+                
+        armor_data = None
+        if needs_armor:
+            armor_data, armor_error = await db.fetch_equipped_armor(user)
+            if armor_error:
+                dblogger.exception(f"Error fetching armor for user {user.id} during stat calculation.")
+                return None
+                
+        inject = {}
+        if needs_player: 
+            inject['player'] = player
+        if needs_armor: 
+            inject['armor_data'] = armor_data
+        if needs_class: 
+            inject['class_name'] = player['class'] if player else None
             
-        armor_data, armor_error = await db._fetch_equipped_armor(user)
+        final_kwargs = {**inject, **kwargs}
         
-        if armor_error:
-            dblogger.exception(f"Error fetching armor for user {user.id} during stat calculation.")
-            return None
-            
-        import inspect
-        # Call the actual function, passing the fetched data
         if inspect.iscoroutinefunction(func):
-            return await func(player, armor_data, *args, **kwargs)
-        return func(player, armor_data, *args, **kwargs)
+            return await func(*args, **final_kwargs)
+        return func(*args, **final_kwargs)
         
     return wrapper
 
 def _get_armor_modifiers(armor_data, stat_prefix):
-    """Centralized helper to extract flat and multiplier stats from armor instance state."""
     flat = 0
     multiplier = 0
     if armor_data and armor_data.get('instance_state'):
@@ -45,6 +59,35 @@ def _get_armor_modifiers(armor_data, stat_prefix):
         flat = state.get(f'flat_{stat_prefix}', 0)
         multiplier = state.get(f'multiplier_{stat_prefix}', 0)
     return flat, multiplier
+
+# stat
+
+@fetchplayer
+async def strength(armor_data, class_name):
+    baseClassBonus = 0
+    if class_name == "Warrior":
+        baseClassBonus = 5
+
+    baseArmorBonus = _get_armor_modifiers(armor_data, 'strength')[0] if armor_data else 0
+    return baseClassBonus + baseArmorBonus
+
+@fetchplayer
+async def dexterity(armor_data, class_name):
+    baseClassBonus = 0
+    if class_name == "Rogue":
+        baseClassBonus = 5
+
+    baseArmorBonus = _get_armor_modifiers(armor_data, 'dexterity')[0] if armor_data else 0
+    return baseClassBonus + baseArmorBonus
+
+@fetchplayer
+async def intelligence(armor_data, class_name):
+    baseClassBonus = 0
+    if class_name == "Mage":
+        baseClassBonus = 5
+        
+    baseArmorBonus = _get_armor_modifiers(armor_data, 'intelligence')[0] if armor_data else 0
+    return baseClassBonus + baseArmorBonus
 
 # active skills
 

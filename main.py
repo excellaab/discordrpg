@@ -9,6 +9,7 @@ from core import db
 
 discord.utils.setup_logging(level=logging.INFO, root=True)
 
+
 class NoTracebackFilter(logging.Filter):
     def filter(self, record):
         if "Attempting a reconnect" in record.getMessage():
@@ -31,6 +32,7 @@ if not token:
 
 if not database_url:
     raise RuntimeError("Database URL is not set.")
+
 
 class Main(commands.Bot):
     def __init__(self):
