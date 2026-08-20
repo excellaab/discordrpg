@@ -5,7 +5,50 @@ import inspect
 from functools import wraps
 from . import db
 
+logger = logging.getLogger("discordrpg")
 dblogger = logging.getLogger("database")
+
+CLASS_OPTIONS = [
+    "Knight",
+    "Assassin",
+    "Mage",
+    "Succubus",
+    "Bard",
+]
+
+class_stat_bonuses = {
+    "strength": {"Knight"},
+    "dexterity": {"Assassin", "Mage"},
+    "intelligence": {"Mage", "Succubus"},
+    "vitality": {"Knight"},
+    "charisma": {"Bard", "Succubus"},
+    "luck": {"Assassin", "Bard"}
+}
+
+# placeholder passives until changed later
+# TODO: change passives, remove these comments when done
+class_passive = {
+    "Knight": [
+        "Takes 15% less damage when below 50% HP.",
+        "Converts 10% of total DEF into bonus attack damage."
+    ],
+    "Assassin": [
+        "100% Critical Strike Chance on the 1st turn of combat.",
+        "Deals +25% damage against enemies below 30% HP (Execute)."
+    ],
+    "Mage": [
+        "Critical spell hits refund 20% of the spell's Mana cost.",
+        "Ignores 20% of enemy Magic Resistance/Defense."
+    ],
+    "Succubus": [
+        "15% Lifesteal: Heals for 15% of all damage dealt.",
+        "When an enemy dies, gains a temporary Bone Shield equal to 10% of Max HP."
+    ],
+    "Bard": [
+        "Gains +20% Gold and +15% XP from all battles and quests.",
+        "Every basic attack has a 25% chance to grant a random party buff (e.g. +ATK, +DEF, or +EVA for 2 turns)."
+    ]
+}
 
 def fetchplayer(func):
     @wraps(func)
@@ -34,7 +77,7 @@ def fetchplayer(func):
             inject['player'] = player
         if needs_armor: 
             inject['armor_data'] = armor_data
-        if needs_class: 
+        if needs_class:
             inject['class_name'] = player['class'] if player else None
             
         final_kwargs = {**inject, **kwargs}
@@ -63,41 +106,43 @@ def _get_armor_modifiers(armor_data, stat_prefix):
 # stat
 
 @fetchplayer
-async def strength(armor_data, class_name):
-    baseClassBonus = 0
-    if class_name == "Warrior":
-        baseClassBonus = 5
+def fetchStat(stat, armor_data, class_name):
+    baseClassBonus = 5 if class_name in class_stat_bonuses.get(stat, set()) else 0
+    baseArmorBonus = _get_armor_modifiers(armor_data, stat)[0] if armor_data else 0
 
-    baseArmorBonus = _get_armor_modifiers(armor_data, 'strength')[0] if armor_data else 0
-    return baseClassBonus + baseArmorBonus
+    return round(baseClassBonus + baseArmorBonus)
 
-@fetchplayer
-async def dexterity(armor_data, class_name):
-    baseClassBonus = 0
-    if class_name == "Rogue":
-        baseClassBonus = 5
-
-    baseArmorBonus = _get_armor_modifiers(armor_data, 'dexterity')[0] if armor_data else 0
-    return baseClassBonus + baseArmorBonus
+# class passives
 
 @fetchplayer
-async def intelligence(armor_data, class_name):
-    baseClassBonus = 0
-    if class_name == "Mage":
-        baseClassBonus = 5
-        
-    baseArmorBonus = _get_armor_modifiers(armor_data, 'intelligence')[0] if armor_data else 0
-    return baseClassBonus + baseArmorBonus
+def classPassive(class_name):
+    try:
+        firstPassive = class_passive[class_name][0]
+    except KeyError:
+        firstPassive = "None"
+    except IndexError:
+        firstPassive = "_Error parsing passive._"
+        logger.exception(f"Failed to parse class first passive. Class name {class_name}.")
+
+    try:
+        secondPassive = class_passive[class_name][1]
+    except KeyError:
+        secondPassive = "None"
+    except IndexError:
+        secondPassive = "_Error parsing passive._"
+        logger.exception(f"Failed to parse class second passive. Class name {class_name}.")
+
+    return firstPassive, secondPassive
 
 # active skills
 
 @fetchplayer
-async def maxhp(player, armor_data):
+def maxhp(player, armor_data):
     flat_hp, multi_hp = _get_armor_modifiers(armor_data, 'hp')
     return round((1 + player.get('vitality', 0) * 0.02) * ((1 + multi_hp) * (100 + (player.get('level', 1)-1) * 50 + flat_hp)), 1)
 
 @fetchplayer
-async def defense(player, armor_data):
+def defense(player, armor_data):
     flat_def, multi_def = _get_armor_modifiers(armor_data, 'defense')
     
     # Defense scales with level, and is boosted heavily by vitality and slightly by strength.
@@ -108,7 +153,7 @@ async def defense(player, armor_data):
     return round((1 + vitality_bonus + strength_bonus) * ((1 + multi_def) * base_def), 1)
 
 @fetchplayer
-async def maxmana(player, armor_data):
+def maxmana(player, armor_data):
     flat_mana, multi_mana = _get_armor_modifiers(armor_data, 'mana')
     
     # Mana scales with level, boosted by intelligence.
@@ -120,7 +165,7 @@ async def maxmana(player, armor_data):
 # passive skills
 
 @fetchplayer
-async def crit_chance(player, armor_data):
+def crit_chance(player, armor_data):
     flat_crit, multi_crit = _get_armor_modifiers(armor_data, 'crit')
     
     # Crit chance receives a small base scaling from dexterity
@@ -130,7 +175,7 @@ async def crit_chance(player, armor_data):
     return round(raw_crit * (1 + multi_crit), 4)
 
 @fetchplayer
-async def crit_damage(player, armor_data):
+def crit_damage(player, armor_data):
     flat_critdmg, multi_critdmg = _get_armor_modifiers(armor_data, 'critdmg')
     
     # Crit damage scales with strength
@@ -140,7 +185,7 @@ async def crit_damage(player, armor_data):
     return round(raw_critdmg * (1 + multi_critdmg), 4)
 
 @fetchplayer
-async def evasion(player, armor_data):
+def evasion(player, armor_data):
     flat_evasion, multi_evasion = _get_armor_modifiers(armor_data, 'evasion')
     
     # Evasion scales with dexterity
@@ -152,7 +197,7 @@ async def evasion(player, armor_data):
     return round(min(0.90, evasion_value), 4)
 
 @fetchplayer
-async def accuracy(player, armor_data):
+def accuracy(player, armor_data):
     flat_acc, multi_acc = _get_armor_modifiers(armor_data, 'accuracy')
     
     # Accuracy scales heavily with dexterity
@@ -162,7 +207,7 @@ async def accuracy(player, armor_data):
     return round(raw_acc * (1 + multi_acc), 4)
 
 @fetchplayer
-async def penetration(player, armor_data):
+def penetration(player, armor_data):
     flat_pen, multi_pen = _get_armor_modifiers(armor_data, 'pen')
     
     # Penetration scales with strength

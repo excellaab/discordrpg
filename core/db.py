@@ -5,7 +5,6 @@ dblogger = logging.getLogger("database")
 dbpool: asyncpg.Pool = None
 
 async def new_player(user):
-    userid = user.id
     try:
         async with dbpool.acquire() as conn:
             response = await conn.fetchrow('''
@@ -13,17 +12,17 @@ async def new_player(user):
                 VALUES ($1) 
                 ON CONFLICT (user_id) DO NOTHING
                 RETURNING user_id;
-            ''', userid)
+            ''', user.id)
             
             return response, False
     except asyncpg.UndefinedTableError as e:
-        dblogger.exception(f"Missing DB table while registering user {userid}: {e}")
+        dblogger.exception(f"Missing DB table while registering user {user.id}: {e}")
         return None, True
     except asyncpg.UndefinedColumnError as e:
-        dblogger.exception(f"Missing DB column while registering user {userid}: {e}")
+        dblogger.exception(f"Missing DB column while registering user {user.id}: {e}")
         return None, True
     except Exception as e:
-        dblogger.exception(f"DB error registering user {userid}: {e}")
+        dblogger.exception(f"DB error registering user {user.id}: {e}")
         return None, True
 
 async def set_class(user, class_name):
@@ -36,10 +35,10 @@ async def set_class(user, class_name):
             ''', class_name, user.id)
     except asyncpg.UndefinedTableError as e:
             dblogger.exception(f"Missing DB table while setting class for user {user.id}: {e}")
-            return None, True
+            return True
     except asyncpg.UndefinedColumnError as e:
         dblogger.exception(f"Missing DB column while setting class for user {user.id}: {e}")
-        return None, True
+        return True
     except Exception as e:
         dblogger.exception(f"DB error setting class for user {user.id}: {e}")
         return True

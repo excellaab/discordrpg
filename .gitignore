@@ -34,3 +34,6 @@ Thumbs.db
 
 # Agent customizations
 .agents/
+
+# Misc
+plan.*

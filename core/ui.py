@@ -1,14 +1,6 @@
 import discord
 from core import db, statcalc
-
-
-CLASS_OPTIONS = [
-    "Knight",
-    "Assassin",
-    "Mage",
-    "Necromancer",
-    "Bard",
-]
+from core.statcalc import CLASS_OPTIONS, classPassive, fetchStat
 
 async def build_profile_embed(bot, user, player, created_at):
     profile_embed = discord.Embed(
@@ -22,27 +14,30 @@ async def build_profile_embed(bot, user, player, created_at):
 
     profile_embed.add_field(
         name="CHAR",
-        value=f"""
-        **Level**: {player['level']}
-        **XP**: {player['xp']}
-        """,
+        value=(
+            f"**Level**: {player['level']}\n"
+            f"**XP**: {player['xp']}"
+        ),
         inline=False,
     )
     profile_embed.add_field(
         name="STAT",
-        value=f"""
-        **STR**: {player['strength']} (+{await statcalc.strength(user):.1f})
-        **DEX**: {player['dexterity']} (+{await statcalc.dexterity(user):.1f})
-        **INT**: {player['intelligence']} (+{await statcalc.intelligence(user):.1f})
-        """,
+        value=(
+            f"**STR**: {player['strength']} (+{await fetchStat(user, "strength")})\n"
+            f"**DEX**: {player['dexterity']} (+{await fetchStat(user, "dexterity")})\n"
+            f"**INT**: {player['intelligence']} (+{await fetchStat(user, "intelligence")})\n"
+            f"**VIT**: {player['vitality']} (+{await fetchStat(user, "vitality")})\n "
+            f"**CHA**: {player['charisma']} (+{await fetchStat(user, "charisma")})\n"
+            f"**LUK**: {player['luck']} (+{await fetchStat(user, "luck")})"
+        ),
         inline=False,
     )
     profile_embed.add_field(
         name="GOLD",
-        value=f"""
-        **Gold**: {player['gold']}G
-        **Crystal**: {player['crystal']}C
-        """,
+        value=(
+            f"**Gold**: {player['gold']}G\n"
+            f"**Crystal**: {player['crystal']}C"
+        ),
         inline=False,
     )
 
@@ -60,24 +55,36 @@ async def build_combat_embed(bot, user, player, created_at):
 
     combat_embed.add_field(
         name="ACTV",
-        value=f"""
-        **HP**: {player['health']:.1f}/{await statcalc.maxhp(user):.1f}
-        **DEF**: {await statcalc.defense(user):.1f}
-        **MANA**: {player['mana']:.1f}/{await statcalc.maxmana(user):.1f}
-        **STAM**: {player['stamina']:.1f}
-        """,
+        value=(
+            f"**HP**: {player['health']:.1f}/{await statcalc.maxhp(user):.1f}\n"
+            f"**DEF**: {await statcalc.defense(user):.1f}\n"
+            f"**MANA**: {player['mana']:.1f}/{await statcalc.maxmana(user):.1f}\n"
+            f"**STAM**: {player['stamina']:.1f}"
+        ),
         inline=False,
     )
     combat_embed.add_field(
         name="PASV",
-        value=f"""
-        **CRIT**: {await statcalc.crit_chance(user) * 100:.2f}%
-        **CDMG**: {await statcalc.crit_damage(user) * 100:.2f}%
-        **EVA**: {await statcalc.evasion(user) * 100:.2f}%
-        **ACC**: {await statcalc.accuracy(user) * 100:.2f}%
-        **PEN**: {await statcalc.penetration(user) * 100:.2f}%
-        """,
+        value=(
+            f"**CRIT**: {await statcalc.crit_chance(user) * 100:.2f}%\n"
+            f"**CDMG**: {await statcalc.crit_damage(user) * 100:.2f}%\n"
+            f"**EVA**: {await statcalc.evasion(user) * 100:.2f}%\n"
+            f"**ACC**: {await statcalc.accuracy(user) * 100:.2f}%\n"
+            f"**PEN**: {await statcalc.penetration(user) * 100:.2f}%"
+        ),
         inline=False,
+    )
+
+    firstPassive, secondPassive = await classPassive(user)
+
+    combat_embed.add_field(
+        name="CLAS",
+        value=(
+            f"**{player['class']} Class Passives**:\n"
+            f"- {firstPassive}\n"
+            f"- {secondPassive}"
+        ),
+        inline=False
     )
 
     return combat_embed
