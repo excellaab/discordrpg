@@ -11,6 +11,7 @@ from core import db
 discord.utils.setup_logging(level=logging.INFO, root=True)
 subprocess.run('cls' if os.name == 'nt' else 'clear', shell=True, check=False)
 
+# Dismiss reconnecting tracebacks
 class NoTracebackFilter(logging.Filter):
     def filter(self, record):
         if "Attempting a reconnect" in record.getMessage():
