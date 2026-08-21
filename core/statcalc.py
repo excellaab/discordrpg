@@ -56,7 +56,7 @@ def fetchStatPts(stat, player, armor_data, class_name):
 
     if stat_growth is not None:
         baseClassBonus = 5
-        extraClassBonus = stat_growth * player['level']
+        extraClassBonus = stat_growth * (player['level']-1)
     else:
         baseClassBonus = 0
         extraClassBonus = 0
@@ -129,7 +129,7 @@ def crit_damage(player, armor_data):
     str_bonus = player.get('strength', 0) * 0.002
     raw_critdmg = player.get('crit_damage', 0) + str_bonus + flat_critdmg
     
-    return round(raw_critdmg * (1 + multi_critdmg), 4)
+    return 1 + round(raw_critdmg * (1 + multi_critdmg), 4)
 
 @db.with_player_context
 def evasion(player, armor_data):
