@@ -1,5 +1,8 @@
 import logging
 import asyncpg
+import json
+import inspect
+from functools import wraps
 
 dblogger = logging.getLogger("database")
 dbpool: asyncpg.Pool = None
@@ -79,3 +82,56 @@ async def fetch_equipped_armor(user):
     except Exception as e:
         dblogger.exception(f"DB error fetching armor for user {user.id}: {e}")
         return None, True
+
+def get_armor_modifiers(armor_data, stat_prefix):
+    flat = 0
+    multiplier = 0
+    if armor_data and armor_data.get('instance_state'):
+        state = armor_data['instance_state']
+        if isinstance(state, str):
+            try:
+                state = json.loads(state)
+            except json.JSONDecodeError:
+                return 0, 0
+                
+        flat = state.get(f'flat_{stat_prefix}', 0)
+        multiplier = state.get(f'multiplier_{stat_prefix}', 0)
+    return flat, multiplier
+
+def with_player_context(func):
+    @wraps(func)
+    async def wrapper(user, *args, **kwargs):
+        sig = inspect.signature(func)
+        needs_player = 'player' in sig.parameters
+        needs_armor = 'armor_data' in sig.parameters
+        needs_class = 'class_name' in sig.parameters
+        
+        player = None
+        if needs_player or needs_class:
+            player, db_error = await fetch_player(user)
+            if db_error:
+                dblogger.exception(f"Error fetching player for user {user.id} during stat calculation.")
+                return None
+                
+        armor_data = None
+        if needs_armor:
+            armor_data, armor_error = await fetch_equipped_armor(user)
+            if armor_error:
+                dblogger.exception(f"Error fetching armor for user {user.id} during stat calculation.")
+                return None
+                
+        inject = {}
+        if needs_player: 
+            inject['player'] = player
+        if needs_armor: 
+            inject['armor_data'] = armor_data
+        if needs_class:
+            inject['class_name'] = player['class'] if player else None
+            
+        final_kwargs = {**inject, **kwargs}
+        
+        if inspect.iscoroutinefunction(func):
+            return await func(*args, **final_kwargs)
+        return func(*args, **final_kwargs)
+        
+    return wrapper
