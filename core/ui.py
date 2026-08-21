@@ -1,6 +1,6 @@
 import discord
 from core import db, statcalc
-from core.statcalc import CLASS_OPTIONS, classPassive, fetchStat
+from core.statcalc import CLASS_OPTIONS, classPassive, fetchStatPts
 
 async def build_profile_embed(bot, user, player, created_at):
     profile_embed = discord.Embed(
@@ -23,12 +23,12 @@ async def build_profile_embed(bot, user, player, created_at):
     profile_embed.add_field(
         name="STAT",
         value=(
-            f"**STR**: {player['strength']} (+{await fetchStat(user, "strength")})\n"
-            f"**DEX**: {player['dexterity']} (+{await fetchStat(user, "dexterity")})\n"
-            f"**INT**: {player['intelligence']} (+{await fetchStat(user, "intelligence")})\n"
-            f"**VIT**: {player['vitality']} (+{await fetchStat(user, "vitality")})\n "
-            f"**CHA**: {player['charisma']} (+{await fetchStat(user, "charisma")})\n"
-            f"**LUK**: {player['luck']} (+{await fetchStat(user, "luck")})"
+            f"**STR**: {player['strength']} (+{await fetchStatPts(user, "strength")})\n"
+            f"**DEX**: {player['dexterity']} (+{await fetchStatPts(user, "dexterity")})\n"
+            f"**INT**: {player['intelligence']} (+{await fetchStatPts(user, "intelligence")})\n"
+            f"**VIT**: {player['vitality']} (+{await fetchStatPts(user, "vitality")})\n "
+            f"**CHA**: {player['charisma']} (+{await fetchStatPts(user, "charisma")})\n"
+            f"**LUK**: {player['luck']} (+{await fetchStatPts(user, "luck")})"
         ),
         inline=False,
     )

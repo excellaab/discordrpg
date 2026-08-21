@@ -135,3 +135,23 @@ def with_player_context(func):
         return func(*args, **final_kwargs)
         
     return wrapper
+
+async def levelup(user):
+    try:
+        async with dbpool.acquire() as conn:
+            level = await conn.execute('''
+                UPDATE players
+                SET statpoint = statpoint + 5
+                WHERE user_id = $1
+                RETURNING level;
+            ''', user.id)
+    except asyncpg.UndefinedTableError as e:
+                dblogger.exception(f"Missing DB table while executing level up event for user {user.id}: {e}")
+                return True, None
+    except asyncpg.UndefinedColumnError as e:
+        dblogger.exception(f"Missing DB column while executing level up event for user {user.id}: {e}")
+        return True, None
+    except Exception as e:
+        dblogger.exception(f"DB error while executing level up event for user {user.id}: {e}")
+        return True, None
+    return False, level
