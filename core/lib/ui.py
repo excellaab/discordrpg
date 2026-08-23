@@ -1,192 +1,61 @@
 import discord
-from core import db, statcalc
-from core.statcalc import CLASS_OPTIONS, classPassive, fetchStatPts
+from core.lib import db
+from core.data.classes import CLASSES
 
-async def build_profile_embed(bot, user, player, created_at):
-    profile_embed = discord.Embed(
-        title=f"{user.name} - {player['class'] if player['class'] else 'NPC'}",
-        color=discord.Color.blue(),
-        timestamp=created_at,
-    )
-
-    profile_embed.set_thumbnail(url=user.avatar.url)
-    profile_embed.set_author(name="Profile/Main", icon_url=bot.user.avatar.url)
-
-    profile_embed.add_field(
-        name="CHAR",
-        value=(
-            f"**Level**: {player['level']}\n"
-            f"**XP**: {player['xp']}"
-        ),
-        inline=False,
-    )
-    profile_embed.add_field(
-        name="STAT",
-        value=(
-            f"**STR**: {player['strength']} (+{await fetchStatPts(user, "strength")})\n"
-            f"**DEX**: {player['dexterity']} (+{await fetchStatPts(user, "dexterity")})\n"
-            f"**INT**: {player['intelligence']} (+{await fetchStatPts(user, "intelligence")})\n"
-            f"**VIT**: {player['vitality']} (+{await fetchStatPts(user, "vitality")})\n "
-            f"**CHA**: {player['charisma']} (+{await fetchStatPts(user, "charisma")})\n"
-            f"**LUK**: {player['luck']} (+{await fetchStatPts(user, "luck")})"
-        ),
-        inline=False,
-    )
-    profile_embed.add_field(
-        name="GOLD",
-        value=(
-            f"**Gold**: {player['gold']}G\n"
-            f"**Crystal**: {player['crystal']}C"
-        ),
-        inline=False,
-    )
-
-    return profile_embed
-
-async def build_combat_embed(bot, user, player, created_at):
-    combat_embed = discord.Embed(
-        title=f"{user.name} - {player['class'] if player['class'] else 'NPC'}",
-        color=discord.Color.red(),
-        timestamp=created_at,
-    )
-
-    combat_embed.set_thumbnail(url=user.avatar.url)
-    combat_embed.set_author(name="Profile/Combat", icon_url=bot.user.avatar.url)
-
-    combat_embed.add_field(
-        name="ACTV",
-        value=(
-            f"**HP**: {player['health']:.1f}/{await statcalc.maxhp(user):.1f}\n"
-            f"**DEF**: {await statcalc.defense(user):.1f}\n"
-            f"**MANA**: {player['mana']:.1f}/{await statcalc.maxmana(user):.1f}\n"
-            f"**STAM**: {player['stamina']:.1f}"
-        ),
-        inline=False,
-    )
-    combat_embed.add_field(
-        name="PASV",
-        value=(
-            f"**CRIT**: {await statcalc.crit_chance(user) * 100:.2f}%\n"
-            f"**CDMG**: {await statcalc.crit_damage(user) * 100:.2f}%\n"
-            f"**EVA**: {await statcalc.evasion(user) * 100:.2f}%\n"
-            f"**ACC**: {await statcalc.accuracy(user) * 100:.2f}%\n"
-            f"**PEN**: {await statcalc.penetration(user) * 100:.2f}%"
-        ),
-        inline=False,
-    )
-
-    firstPassive, secondPassive = await classPassive(user)
-
-    combat_embed.add_field(
-        name="CLAS",
-        value=(
-            f"**{player['class']} Class Passives**:\n"
-            f"- {firstPassive}\n"
-            f"- {secondPassive}"
-        ),
-        inline=False
-    )
-
-    return combat_embed
-
-
-class ProfileView(discord.ui.View):
-    def __init__(self, bot, user, player, active_page="main"):
-        super().__init__(timeout=180)
-        self.bot = bot
-        self.user = user
-        self.player = player
-
-        if active_page == "main":
-            self.main_button.disabled = True
-            self.combat_button.disabled = False
-        else:
-            self.main_button.disabled = False
-            self.combat_button.disabled = True
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user.id:
-            return False
-        return True
-
-    async def on_timeout(self):
-        for child in self.children:
-            child.disabled = True
-        if hasattr(self, "message") and self.message:
-            try:
-                await self.message.edit(view=self)
-            except discord.HTTPException:
-                pass
-
-    @discord.ui.button(label="Main", style=discord.ButtonStyle.primary)
-    async def main_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        player, db_error = await db.fetch_player(self.user)
-        if db_error or not player:
-            await interaction.response.send_message("Something went wrong.", ephemeral=True)
-            return
-
-        self.player = player
-        embed = await build_profile_embed(self.bot, self.user, self.player, discord.utils.utcnow())
-
-        self.main_button.disabled = True
-        self.combat_button.disabled = False
-
-        await interaction.response.edit_message(embed=embed, view=self)
-
-    @discord.ui.button(label="Combat", style=discord.ButtonStyle.primary)
-    async def combat_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        player, db_error = await db.fetch_player(self.user)
-        if db_error or not player:
-            await interaction.response.send_message("Something went wrong.", ephemeral=True)
-            return
-
-        self.player = player
-        embed = await build_combat_embed(self.bot, self.user, self.player, discord.utils.utcnow())
-
-        self.main_button.disabled = False
-        self.combat_button.disabled = True
-
-        await interaction.response.edit_message(embed=embed, view=self)
-
-
-class ClassChoiceSelect(discord.ui.Select):
+class ClassSelect(discord.ui.Select):
     def __init__(self):
-        options = [discord.SelectOption(label=class_name, value=class_name) for class_name in CLASS_OPTIONS]
-        super().__init__(placeholder="Choose class", min_values=1, max_values=1, options=options)
+        options = [
+            discord.SelectOption(label=c_name, description=c_info['description']) 
+            for c_name, c_info in CLASSES.items()
+        ]
+        super().__init__(placeholder="Choose your class...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        selected_class = self.values[0]
-        dberror = await db.set_class(interaction.user, selected_class)
-
-        if dberror:
-            self.view.error = True
-            await interaction.response.send_message("Something went wrong.", ephemeral=True)
-
+        class_name = self.values[0]
+        
+        # Check if user already exists
+        player, db_error = await db.fetch_player(interaction.user)
+        if db_error:
+            await interaction.response.send_message("An error occurred while accessing the database. Please try again later.", ephemeral=True)
+            return
+            
+        if player:
+            await interaction.response.send_message(f"You already have a save file! Your current class is **{player['class']}**.", ephemeral=True)
+            self.disabled = True
+            await interaction.message.edit(view=self.view)
             self.view.stop()
             return
+            
+        # Create new player
+        inserted, create_error = await db.new_player(interaction.user, class_name)
         
-        # TODO: improve ui, change into embed with icons
-        await interaction.response.send_message(f"Welcome, **{interaction.user.name}**! You are playing as a **{selected_class}**.", ephemeral=False)
+        if create_error:
+            await interaction.response.send_message("An error occurred while creating your save file.", ephemeral=True)
+            return
+            
+        if not inserted:
+             await interaction.response.send_message("You already have a save file!", ephemeral=True)
+             self.disabled = True
+             await interaction.message.edit(view=self.view)
+             self.view.stop()
+             return
+
+        await interaction.response.send_message(f"Welcome to the game, {interaction.user.name}! Your character has been created with the **{class_name}** class. You can view your profile with `!profile`.")
+        
+        # Disable the select menu after successful selection
+        self.disabled = True
+        await interaction.message.edit(view=self.view)
         self.view.stop()
 
 
-class ClassChoiceView(discord.ui.View):
-    def __init__(self, user):
+class ClassSelectView(discord.ui.View):
+    def __init__(self, original_user):
         super().__init__(timeout=180)
-        self.user = user
-        self.error = False
-        self.add_item(ClassChoiceSelect())
+        self.original_user = original_user
+        self.add_item(ClassSelect())
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user.id:
+        if interaction.user != self.original_user:
+            await interaction.response.send_message("This menu is not for you!", ephemeral=True)
             return False
         return True
-
-    async def on_timeout(self):
-        for child in self.children:
-            child.disabled = True
-        if hasattr(self, "message") and self.message:
-            try:
-                await self.message.edit(view=self)
-            except discord.HTTPException:
-                pass

@@ -7,15 +7,15 @@ from functools import wraps
 dblogger = logging.getLogger("database")
 dbpool: asyncpg.Pool = None
 
-async def new_player(user):
+async def new_player(user, class_name):
     try:
         async with dbpool.acquire() as conn:
             response = await conn.fetchrow('''
-                INSERT INTO players (user_id) 
-                VALUES ($1) 
+                INSERT INTO players (user_id, class) 
+                VALUES ($1, $2) 
                 ON CONFLICT (user_id) DO NOTHING
                 RETURNING user_id;
-            ''', user.id)
+            ''', user.id, class_name)
             
             return response, False
     except asyncpg.UndefinedTableError as e:
@@ -83,21 +83,6 @@ async def fetch_equipped_armor(user):
         dblogger.exception(f"DB error fetching armor for user {user.id}: {e}")
         return None, True
 
-def get_armor_modifiers(armor_data, stat_prefix):
-    flat = 0
-    multiplier = 0
-    if armor_data and armor_data.get('instance_state'):
-        state = armor_data['instance_state']
-        if isinstance(state, str):
-            try:
-                state = json.loads(state)
-            except json.JSONDecodeError:
-                return 0, 0
-                
-        flat = state.get(f'flat_{stat_prefix}', 0)
-        multiplier = state.get(f'multiplier_{stat_prefix}', 0)
-    return flat, multiplier
-
 def with_player_context(func):
     @wraps(func)
     async def wrapper(user, *args, **kwargs):
@@ -139,12 +124,7 @@ def with_player_context(func):
 async def levelup(user):
     try:
         async with dbpool.acquire() as conn:
-            level = await conn.execute('''
-                UPDATE players
-                SET statpoint = statpoint + 5
-                WHERE user_id = $1
-                RETURNING level;
-            ''', user.id)
+            pass
     except asyncpg.UndefinedTableError as e:
                 dblogger.exception(f"Missing DB table while executing level up event for user {user.id}: {e}")
                 return True, None
@@ -154,4 +134,4 @@ async def levelup(user):
     except Exception as e:
         dblogger.exception(f"DB error while executing level up event for user {user.id}: {e}")
         return True, None
-    return False, level
+    return False, None

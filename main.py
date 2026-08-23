@@ -6,7 +6,7 @@ import discord
 import asyncpg
 from discord.ext import commands
 from dotenv import load_dotenv
-from core import db
+from core.lib import db
 
 discord.utils.setup_logging(level=logging.INFO, root=True)
 subprocess.run('cls' if os.name == 'nt' else 'clear', shell=True, check=False)

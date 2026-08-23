@@ -10,4 +10,4 @@ applyTo: "**/*.py"
 - Use `uv add` and `uv remove` for dependency changes so `pyproject.toml` and `uv.lock` stay synchronized.
 - Do not use bare `python`, `pip`, or other package-manager commands for project work.
 - Follow the existing async patterns for Discord commands and database operations.
-- Keep database access in `core/db.py` and preserve the existing `(result, db_error)` error-reporting convention when extending it.
+- Keep database access in `core/lib/db.py` and preserve the existing `(result, db_error)` error-reporting convention when extending it.
