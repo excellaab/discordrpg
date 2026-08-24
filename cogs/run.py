@@ -1,4 +1,5 @@
 from discord.ext import commands
+from core.lib.ui.run_ui import RunConfirmationView
 
 
 class Run(commands.Cog):
@@ -6,8 +7,9 @@ class Run(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def startrun(self, ctx):
-        pass
+    async def run(self, ctx):
+        view = RunConfirmationView(ctx.author)
+        view.message = await ctx.send("Start a run?", view=view, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Run(bot))
