@@ -34,6 +34,7 @@ Thumbs.db
 
 # Agent customizations
 .agents/
+.github/
 
 # Misc
 plan.*

@@ -184,6 +184,9 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.2" },
 ]
 
+[package.metadata.requires-dev]
+dev = []
+
 [[package]]
 name = "frozenlist"
 version = "1.8.0"

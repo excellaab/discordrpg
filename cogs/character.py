@@ -1,11 +1,9 @@
-import logging
 import discord
 from discord.ext import commands
 from core.lib import db
 from core.data.classes import CLASSES
 from core.ui.class_select import ClassSelectView
 
-logger = logging.getLogger("discordrpg")
 
 
 class Character(commands.Cog):

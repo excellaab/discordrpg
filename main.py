@@ -1,5 +1,4 @@
 # use uv instead of pip/python
-import logging
 import os
 import subprocess
 import discord
@@ -8,22 +7,8 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from core.lib import db
 
-discord.utils.setup_logging(level=logging.INFO, root=True)
+from core.lib.log import botlogger, dblogger
 subprocess.run('cls' if os.name == 'nt' else 'clear', shell=True, check=False)
-
-# Dismiss reconnecting tracebacks
-class NoTracebackFilter(logging.Filter):
-    def filter(self, record):
-        if "Attempting a reconnect" in record.getMessage():
-            record.exc_info = None 
-            record.exc_text = None
-        return True
-    
-botlogger = logging.getLogger("discordrpg")
-botlogger.addFilter(NoTracebackFilter())
-
-dblogger = logging.getLogger("database")
-dblogger.setLevel(logging.INFO)
 
 load_dotenv()
 token = os.getenv("DISCORD_TOKEN")
