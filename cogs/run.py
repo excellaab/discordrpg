@@ -1,5 +1,5 @@
 from discord.ext import commands
-from core.lib.ui.run_ui import RunConfirmationView
+from core.ui.run_ui import RunConfirmationView
 
 
 class Run(commands.Cog):

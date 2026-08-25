@@ -1,6 +1,7 @@
 import discord
 from core.lib import db
 
+
 class RunConfirmationView(discord.ui.View):
     def __init__(self, original_user):
         super().__init__(timeout=60)
@@ -38,10 +39,12 @@ class RunConfirmationView(discord.ui.View):
             self.stop()
             return
 
-        if started_new_run:
-            await interaction.response.edit_message(content="Run started!", view=None)
-        else:
-            await interaction.response.edit_message(content="You already have an active run.", view=None, ephemeral=True)
+        main_run_embed = discord.Embed(
+            title="Run",
+            description="[Placeholder main run embed]"
+        )
+
+        await interaction.response.edit_message(content=None, embed=main_run_embed, view=None)
         self.stop()
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.red)

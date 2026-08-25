@@ -13,7 +13,6 @@ class ClassSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         class_name = self.values[0]
         
-        # Check if user already exists
         player, db_error = await db.fetch_player(interaction.user)
         if db_error:
             await interaction.response.send_message("An error occurred while accessing the database. Please try again later.", ephemeral=True)
@@ -26,7 +25,6 @@ class ClassSelect(discord.ui.Select):
             self.view.stop()
             return
             
-        # Create new player
         inserted, create_error = await db.new_player(interaction.user, class_name)
         
         if create_error:
@@ -42,7 +40,6 @@ class ClassSelect(discord.ui.Select):
 
         await interaction.response.send_message(f"Welcome to the game, {interaction.user.name}! Your character has been created with the **{class_name}** class. You can view your profile with `!profile`.")
         
-        # Disable the select menu after successful selection
         self.disabled = True
         await interaction.message.edit(view=self.view)
         self.view.stop()
@@ -56,6 +53,5 @@ class ClassSelectView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.original_user:
-            await interaction.response.send_message("This menu is not for you!", ephemeral=True)
             return False
         return True
