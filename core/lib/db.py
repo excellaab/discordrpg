@@ -1,10 +1,8 @@
-import logging
 import asyncpg
 import json
 import inspect
 from functools import wraps
-
-dblogger = logging.getLogger("database")
+from core.lib.log import dblogger
 dbpool: asyncpg.Pool = None
 
 async def new_player(user, class_name):
