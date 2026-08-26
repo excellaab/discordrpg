@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from core.ui.run_ui import RunConfirmationView, MainRunView
-from core.lib import db
+from core.lib.db import *
 
 
 class Run(commands.Cog):
@@ -9,16 +9,13 @@ class Run(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def run(self, ctx):
-        player, db_error = await db.fetch_player(ctx.author)
-        if db_error:
-            await ctx.send("Error fetching player.", ephemeral=True)
-            return
+    @with_player_context
+    async def run(self, ctx, player):
         if not player:
             await ctx.send("You don't have a character yet. Use `!start` first.", ephemeral=True)
             return
             
-        run, db_error = await db.fetchrun(ctx.author)
+        run, db_error = await fetchrun(ctx.author)
         if db_error:
             await ctx.send("Error fetching run.", ephemeral=True)
             return

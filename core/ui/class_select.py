@@ -10,14 +10,10 @@ class ClassSelect(discord.ui.Select):
         ]
         super().__init__(placeholder="Choose your class...", min_values=1, max_values=1, options=options)
 
-    async def callback(self, interaction: discord.Interaction):
+    @db.with_player_context
+    async def callback(self, interaction: discord.Interaction, player):
         class_name = self.values[0]
         
-        player, db_error = await db.fetch_player(interaction.user)
-        if db_error:
-            await interaction.response.send_message("An error occurred while accessing the database. Please try again later.", ephemeral=True)
-            return
-            
         if player:
             await interaction.response.send_message(f"You already have a save file! Your current class is **{player['class']}**.", ephemeral=True)
             self.disabled = True

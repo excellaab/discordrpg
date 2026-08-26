@@ -11,13 +11,8 @@ class Character(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def start(self, ctx):
-        # Check if user already exists
-        player, db_error = await db.fetch_player(ctx.author)
-        if db_error:
-            await ctx.send("An error occurred while accessing the database. Please try again later.")
-            return
-
+    @db.with_player_context
+    async def start(self, ctx, player):
         if player:
             await ctx.send(f"You already have a save file! Your current class is **{player['class']}**.")
             return
@@ -29,13 +24,8 @@ class Character(commands.Cog):
         await ctx.send(welcome_msg, view=view)
 
     @commands.command()
-    async def profile(self, ctx):
-        player, db_error = await db.fetch_player(ctx.author)
-        
-        if db_error:
-            await ctx.send("An error occurred while accessing the database.")
-            return
-            
+    @db.with_player_context
+    async def profile(self, ctx, player):
         if not player:
             await ctx.send("You don't have a character yet. Use `!start` to create one!")
             return

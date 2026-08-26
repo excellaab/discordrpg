@@ -27,7 +27,7 @@ class Main(commands.Bot):
 
     async def setup_hook(self):
         try:
-            db.dbpool = await asyncpg.create_pool(database_url)
+            db.dbpool = await asyncpg.create_pool(database_url, init=db.init_db)
             dblogger.info("Database pool created successfully.")
         except Exception as e:
             dblogger.exception(f"Failed to create database pool: {e}")

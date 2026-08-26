@@ -4,8 +4,25 @@ import inspect
 from functools import wraps
 from core.lib.log import dblogger
 import discord
-dbpool: asyncpg.Pool = None
+import enum
 
+class GearTier(enum.IntEnum):
+    common = 1
+    rare = 2
+    legendary = 3
+    prismatic_i = 4
+    prismatic_ii = 5
+    prismatic_iii = 6
+
+async def init_db(conn: asyncpg.Connection):
+    await conn.set_type_codec(
+        'gear_tier',
+        encoder=lambda t: t.name,
+        decoder=lambda t: GearTier[t],
+        schema='public'
+    )
+
+dbpool: asyncpg.Pool = None
 def dbExceptionHandler(func):
     @wraps(func)
     async def wrapper(user: discord.User, *args, **kwargs):
@@ -48,43 +65,84 @@ async def fetch_player(user: discord.User, conn: asyncpg.Connection):
     return player, False
 
 @dbExceptionHandler
-async def fetch_equipped_armor(user: discord.User, conn: asyncpg.Connection):
-    armor = await conn.fetchrow('''
-        SELECT i.instance_state 
-        FROM player_equipment e
-        JOIN player_inventory i ON e.armor_instance_id = i.instance_id
+async def fetch_equipment(user: discord.User, conn: asyncpg.Connection):
+    records = await conn.fetch('''
+        SELECT i.* 
+        FROM run_equipment e
+        JOIN run_inventory i ON i.instance_id IN (
+            e.armor_instance_id, 
+            e.weapon_instance_id, 
+            e.secondary_instance_id
+        )
         WHERE e.user_id = $1
     ''', user.id)
 
-    return armor, False
+    # gear_slot = ['armor', 'weapon', 'secondary']
+    equipment = {record['slot']: record for record in records}
+    
+    return equipment, False
 
 def with_player_context(func):
     @wraps(func)
-    async def wrapper(user, *args, **kwargs):
+    async def wrapper(*args, **kwargs):
+        # check if the user object exists
+        user = kwargs.get('user')
+        ctx_or_interaction = None
+        if not user:
+            for arg in args:
+                if isinstance(arg, (discord.User, discord.Member)):
+                    user = arg
+                    break
+                elif hasattr(arg, 'author') and isinstance(getattr(arg, 'author'), (discord.User, discord.Member)):
+                    user = arg.author
+                    ctx_or_interaction = arg
+                    break
+                elif hasattr(arg, 'user') and isinstance(getattr(arg, 'user'), (discord.User, discord.Member)):
+                    user = arg.user
+                    ctx_or_interaction = arg
+                    break
+                    
+        if not user:
+            # fallback if user object doesnt exist
+            return await func(*args, **kwargs) if inspect.iscoroutinefunction(func) else func(*args, **kwargs)
+
         sig = inspect.signature(func)
+        needs_user = 'user' in sig.parameters
         needs_player = 'player' in sig.parameters
-        needs_armor = 'armor_data' in sig.parameters
+        needs_gear = 'equipment' in sig.parameters
         needs_class = 'class_name' in sig.parameters
         
+        async def send_error(msg):
+            if ctx_or_interaction:
+                if hasattr(ctx_or_interaction, 'send'):
+                    await ctx_or_interaction.send(msg)
+                elif hasattr(ctx_or_interaction, 'response') and hasattr(ctx_or_interaction.response, 'send_message'):
+                    if not ctx_or_interaction.response.is_done():
+                        await ctx_or_interaction.response.send_message(msg, ephemeral=True) 
+
         player = None
         if needs_player or needs_class:
             player, db_error = await fetch_player(user)
             if db_error:
-                dblogger.exception(f"Error fetching player for user {user.id} during stat calculation.")
+                dblogger.exception(f"Error fetching player for user {user.id}")
+                await send_error("An error occurred while accessing the database. Please try again later.")
                 return None
                 
-        armor_data = None
-        if needs_armor:
-            armor_data, armor_error = await fetch_equipped_armor(user)
+        equipment = None
+        if needs_gear:
+            equipment, armor_error = await fetch_equipment(user)
             if armor_error:
-                dblogger.exception(f"Error fetching armor for user {user.id} during stat calculation.")
+                dblogger.exception(f"Error fetching armor for user {user.id}")
+                await send_error("An error occurred while accessing the database. Please try again later.")
                 return None
                 
         inject = {}
+        if needs_user:
+            inject['user'] = user
         if needs_player: 
             inject['player'] = player
-        if needs_armor: 
-            inject['armor_data'] = armor_data
+        if needs_gear: 
+            inject['equipment'] = equipment
         if needs_class:
             inject['class_name'] = player['class'] if player else None
             
