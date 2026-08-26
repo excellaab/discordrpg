@@ -72,7 +72,7 @@ ROOMS: dict[str, Room] = {
         tags={"boss", "prismatic", "danger"},
     ),
     "basecamp": Room(
-        floors={1},
+        floors={1, 2, 3, 4},
         generate=roomgen.gen_basecamp,
         view=run_ui.BasecampView,
         weight=0,
