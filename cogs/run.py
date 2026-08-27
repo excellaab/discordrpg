@@ -10,14 +10,9 @@ class Run(commands.Cog):
 
     @commands.command()
     @with_player_context
-    async def run(self, ctx, player):
+    async def run(self, ctx, player, run):
         if not player:
             await ctx.send("You don't have a character yet. Use `!start` first.", ephemeral=True)
-            return
-            
-        run, db_error = await fetchrun(ctx.author)
-        if db_error:
-            await ctx.send("Error fetching run.", ephemeral=True)
             return
 
         if run:

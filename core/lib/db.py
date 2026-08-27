@@ -28,7 +28,8 @@ def dbExceptionHandler(func):
     async def wrapper(user: discord.User, *args, **kwargs):
         try:
             async with dbpool.acquire() as conn:
-                return await func(user, conn, *args, **kwargs)
+                response = await func(user, conn, *args, **kwargs)
+                return response, False
         except asyncpg.UndefinedTableError as e:
             dblogger.exception(f"Missing DB table. UserID: {user.id}. Error: {e}")
             return None, True
@@ -48,8 +49,7 @@ async def new_player(user: discord.User, conn: asyncpg.Connection, class_name: s
         ON CONFLICT (user_id) DO NOTHING
         RETURNING user_id;
     ''', user.id, class_name)
-    
-    return response, False
+    return response
 
 @dbExceptionHandler
 async def set_class(user: discord.User, conn: asyncpg.Connection, class_name: str):
@@ -62,7 +62,7 @@ async def set_class(user: discord.User, conn: asyncpg.Connection, class_name: st
 @dbExceptionHandler
 async def fetch_player(user: discord.User, conn: asyncpg.Connection):
     player = await conn.fetchrow('SELECT * FROM players WHERE user_id = $1', user.id)
-    return player, False
+    return player
 
 @dbExceptionHandler
 async def fetch_equipment(user: discord.User, conn: asyncpg.Connection):
@@ -79,8 +79,7 @@ async def fetch_equipment(user: discord.User, conn: asyncpg.Connection):
 
     # gear_slot = ['armor', 'weapon', 'secondary']
     equipment = {record['slot']: record for record in records}
-    
-    return equipment, False
+    return equipment
 
 def with_player_context(func):
     @wraps(func)
@@ -111,6 +110,7 @@ def with_player_context(func):
         needs_player = 'player' in sig.parameters
         needs_gear = 'equipment' in sig.parameters
         needs_class = 'class_name' in sig.parameters
+        needs_run = 'run' in sig.parameters
         
         async def send_error(msg):
             if ctx_or_interaction:
@@ -136,6 +136,14 @@ def with_player_context(func):
                 await send_error("An error occurred while accessing the database. Please try again later.")
                 return None
                 
+        run = None
+        if needs_run:
+            run, run_error = await fetchrun(user)
+            if run_error:
+                dblogger.exception(f"Error fetching run for user {user.id}")
+                await send_error("An error occurred while accessing the database. Please try again later.")
+                return None
+                
         inject = {}
         if needs_user:
             inject['user'] = user
@@ -145,6 +153,8 @@ def with_player_context(func):
             inject['equipment'] = equipment
         if needs_class:
             inject['class_name'] = player['class'] if player else None
+        if needs_run:
+            inject['run'] = run
             
         final_kwargs = {**inject, **kwargs}
         
@@ -155,8 +165,31 @@ def with_player_context(func):
     return wrapper
 
 @dbExceptionHandler
-async def levelup(user: discord.User, conn: asyncpg.Connection):
-    pass
+async def update_xp(user: discord.User, conn: asyncpg.Connection, xp: int, levelup: int = 0):
+    await conn.execute('''
+        UPDATE runs
+        SET xp = $2
+        WHERE user_id = $1;
+    ''', user.id, xp)
+
+    if levelup > 0:
+        await conn.execute('''
+            UPDATE runs
+            SET run_level = run_level + $2
+            WHERE user_id = $1;
+        ''', user.id, levelup)
+
+    return None
+
+@dbExceptionHandler
+async def update_relic(user: discord.User, conn: asyncpg.Connection, relic: int):
+    await conn.execute('''
+        UPDATE players
+        SET relic = relic + $1
+        WHERE user_id = $2;
+    ''', user.id, relic)
+
+    return None
 
 @dbExceptionHandler
 async def startrun(user: discord.User, conn: asyncpg.Connection, hp: int):
@@ -168,17 +201,16 @@ async def startrun(user: discord.User, conn: asyncpg.Connection, hp: int):
         ON CONFLICT (user_id) DO NOTHING
         RETURNING *;
     ''', user.id, hp)
-    
-    return response, False
+    return response
 
 @dbExceptionHandler
 async def fetchrun(user: discord.User, conn: asyncpg.Connection):
     run = await conn.fetchrow('SELECT * FROM runs WHERE user_id = $1', user.id)
-    
-    return run, False
+
+    return run
 
 @dbExceptionHandler
 async def endrun(user: discord.User, conn: asyncpg.Connection):
     await conn.fetchrow('DELETE FROM runs WHERE user_id = $1', user.id)
-    
-    return False
+
+    return None
