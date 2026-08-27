@@ -19,7 +19,7 @@ def gen_room(rank, floor, number, current_room):
     weights = [
         ROOMS[room].weight
         for room in candidates
-        if not (ROOMS[room].tag == "safe" and ROOMS[current_room].tag == "safe")
+        if not ("safe" in ROOMS[room].tags and "safe" in ROOMS[current_room].tags)
     ]
 
-    return ROOMS[random.choices(candidates, weights=weights)].generate(rank, floor)
+    return ROOMS[random.choices(candidates, weights=weights)[0]].generate(rank, floor)
