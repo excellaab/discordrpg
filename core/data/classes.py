@@ -1,5 +1,14 @@
+from enum import StrEnum
+
+
+class CharacterClass(StrEnum):
+    DAGGER = "Dagger"
+    PET = "Pet"
+    GUNNER = "Gunner"
+
+
 CLASSES = {
-    "Dagger": {
+    CharacterClass.DAGGER: {
         "name": "Dagger",
         "description": "A swift melee fighter.",
         "base_passive": {
@@ -9,7 +18,7 @@ CLASSES = {
         },
         "starter_cards": ["slash", "slash", "dash", "block"]
     },
-    "Pet": {
+    CharacterClass.PET: {
         "name": "Pet",
         "description": "Fights alongside a loyal companion.",
         "base_passive": {
@@ -19,7 +28,7 @@ CLASSES = {
         },
         "starter_cards": ["command", "command", "block", "block"]
     },
-    "Gunner": {
+    CharacterClass.GUNNER: {
         "name": "Gunner",
         "description": "A ranged specialist.",
         "base_passive": {
