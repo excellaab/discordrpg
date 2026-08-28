@@ -1,7 +1,8 @@
 import discord
-from core.lib import db
-from core.lib.log import dblogger
 
+from core.lib import db
+from core.lib.run import *
+from core.lib.log import dblogger
 
 class RunConfirmationView(discord.ui.View):
     def __init__(self, original_user):
@@ -64,12 +65,71 @@ class BaseRoomView(discord.ui.View):
         return True
 
 
+class CardSelectionView(BaseRoomView):
+    def __init__(self, original_user, cards: list[str], remaining_levels: list[int]):
+        super().__init__(original_user)
+        self.cards = cards
+        self.remaining_levels = remaining_levels
+
+        for idx, card in enumerate(cards):
+            btn = discord.ui.Button(label=f"{card}", style=discord.ButtonStyle.primary, custom_id=f"take_card_{idx}")
+            btn.callback = self.make_callback(card)
+            self.add_item(btn)
+
+    def make_callback(self, card_name: str):
+        async def card_callback(interaction: discord.Interaction):
+            # await db.update_cards(user=self.original_user, card=card_name)
+            # (function not implemented in db.py yet)
+
+            if self.remaining_levels:
+                next_level = self.remaining_levels.pop(0)
+                next_cards = await generate_card(user=self.original_user, level=next_level)
+                
+                view = CardSelectionView(self.original_user, next_cards, self.remaining_levels)
+                embed = discord.Embed(title=f"Level Up! (Level {next_level})", description="Choose a card:")
+                await interaction.response.edit_message(embed=embed, view=view)
+            else:
+                # 3. No more level ups, proceed to the next room (Basecamp)
+                view = BasecampView(self.original_user)
+                embed = discord.Embed(title="Basecamp", description="You rest at the basecamp.")
+                await interaction.response.edit_message(embed=embed, view=view)
+                
+        return card_callback
+
+
 class BasecampView(BaseRoomView):
     pass
 
 
 class BattleView(BaseRoomView):
-    pass
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.green)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        run, db_error = await db.fetchrun(self.original_user)
+        if db_error or not run:
+            await interaction.response.send_message("Error fetching run data.", ephemeral=True)
+            return
+
+        current_level = run['run_level']
+        
+        level_increment, xp = await on_gain_xp(user=self.original_user, xp=100) # temp placeholder xp
+
+        await db.update_xp(user=self.original_user, xp=xp, levelup=level_increment)
+
+        if level_increment > 0:
+            levels_to_process = [current_level + i + 1 for i in range(level_increment)]
+            
+            first_level = levels_to_process.pop(0)
+            cards = await generate_card(user=self.original_user, level=first_level)
+            
+            view = CardSelectionView(self.original_user, cards, levels_to_process)
+            embed = discord.Embed(title=f"Level Up! (Level {first_level})", description="Choose a card:")
+            await interaction.response.edit_message(embed=embed, view=view)
+        else:
+            # move to next room; this is placeholder
+            view = BasecampView(self.original_user)
+            embed = discord.Embed(title="Basecamp", description="You rest at the basecamp.")
+            await interaction.response.edit_message(embed=embed, view=view)
+
 
 
 class EventView(BaseRoomView):

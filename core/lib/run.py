@@ -1,7 +1,8 @@
 import random
+import asyncpg
 from .db import *
 from .log import botlogger, dblogger
-from core.data.cards import CARDS, CARDS_BY_RARITY
+from core.data.cards import *
 
 CARD_DROPRATE: dict[int, list[int]] = {
     0: [80, 19, 1, 0],
@@ -17,28 +18,27 @@ CARD_GUARANTEED: dict[int, GearTier] = {
     3: GearTier.legendary,
 }
 
-RARITIES = [GearTier.common, GearTier.rare, GearTier.legendary, GearTier.prismatic_i]
+RARITIES: list[GearTier] = [GearTier.common, GearTier.rare, GearTier.legendary, GearTier.prismatic_i]
 
 @with_player_context
-async def generate_card(user, run):
-    pulls = 2
+def generate_card(run: asyncpg.Record, level: int) -> list[str]:
+    pulls: int = 2
 
     # Level 1–4: 80% Common, 19% Rare, 1% Legendary
     # Level 5–9: 55% Common, 38% Rare, 7% Legendary
     # Level 10–14: 35% Common, 50% Rare, 14% Legendary, 1% Prismatic I
     # Level 15+: 20% Common, 50% Rare, 25% Legendary, 5% Prismatic I
     # Level 0 and 5 guarantees a rare card, level 10 and 15 guarantees a legendary
-    level = run['level']
-    cards = []
+    cards: list[str] = []
     
     for x in range(pulls):
-        bracket = min(level // 5, 3)
+        bracket: int = min(level // 5, 3)
         if level % 5 == 0:
-            rolled_rarity = CARD_GUARANTEED[bracket]
+            rolled_rarity: GearTier = CARD_GUARANTEED[bracket]
         else:
-            rolled_rarity = random.choices(RARITIES, weights=CARD_DROPRATE[bracket])[0]
+            rolled_rarity: GearTier = random.choices(RARITIES, weights=CARD_DROPRATE[bracket])[0]
             
-        available_cards = [c for c in CARDS_BY_RARITY[rolled_rarity] if c not in cards]
+        available_cards: list[str] = [c for c in CARDS_BY_RARITY[rolled_rarity] if c not in cards]
         if not available_cards:
             available_cards = CARDS_BY_RARITY[rolled_rarity]
             
@@ -47,32 +47,30 @@ async def generate_card(user, run):
     return cards
 
 @with_player_context
-async def on_gain_xp(user, run, xp):
-    temp_xp = run['xp'] + xp
-    level = run['run_level']
-    xp_threshold = 100 * 1.25**(level-1)
+def on_gain_xp(run: asyncpg.Record, xp: int) -> tuple[int, int]:
+    temp_xp: int = run['xp'] + xp
+    level: int = run['run_level']
+    xp_threshold: int = 100 * 1.25**(level-1)
+    level_increment: int = 0
 
-    if temp_xp >= xp_threshold:
-        level_increment = 0
+    while temp_xp >= xp_threshold:
+        level_increment += 1
+        curr_level: int = level+level_increment
 
-        while temp_xp >= xp_threshold:
-            level_increment += 1
-            temp_xp -= xp_threshold
-            xp_threshold = 100 * 1.25**((level+level_increment)-1)
-            
-        await update_xp(user, xp=temp_xp, levelup=level_increment)
-    else:
-        await update_xp(user, xp=temp_xp)
+        temp_xp -= xp_threshold
+        xp_threshold = 100 * 1.25**((curr_level)-1)
+
+    return level_increment, temp_xp
 
 @with_player_context
-async def on_death(user, player, equipment, victory):
+async def on_death(user: discord.User, player: asyncpg.Record, equipment: asyncpg.Record, victory: bool) -> bool:
     if not player:
         # this should not happen
         # if it triggers, there may be an issue with fetch_player or with_player_context
         dblogger.error(f"Unable to kill player: Player not found. Userid {user.id}")
         return False
 
-    dberror = await endrun(user)
+    dberror: bool = await endrun(user)
 
     if dberror:
         dblogger.error(f"Unable to kill player: Failed to update user database on death. Userid {user.id}.")
