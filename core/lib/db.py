@@ -22,13 +22,15 @@ async def init_db(conn: asyncpg.Connection):
         schema='public'
     )
 
-dbpool: asyncpg.Pool = None
-def dbExceptionHandler(func):
+dbpool: asyncpg.Pool | None = None
+def db_exception_handler(func):
     @wraps(func)
     async def wrapper(user: discord.User, *args, **kwargs):
         try:
+            if dbpool is None:
+                raise RuntimeError("Database pool has not been initialized.")
             async with dbpool.acquire() as conn:
-                response = await func(user, conn, *args, **kwargs)
+                response = await func(user, *args, conn=conn, **kwargs)
                 return response, False
         except asyncpg.UndefinedTableError as e:
             dblogger.exception(f"Missing DB table. UserID: {user.id}. Error: {e}")
@@ -37,12 +39,19 @@ def dbExceptionHandler(func):
             dblogger.exception(f"Missing DB column. UserID: {user.id}. Error: {e}")
             return None, True
         except Exception as e:
-            dblogger.exception(f"DB error occured. UserID: {user.id}. Error: {e}")
+            dblogger.exception(f"DB error occurred. UserID: {user.id}. Error: {e}")
             return None, True
     return wrapper
 
-@dbExceptionHandler
-async def new_player(user: discord.User, conn: asyncpg.Connection, class_name: str):
+@db_exception_handler
+async def new_player(
+    user: discord.User,
+    class_name: str,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     response = await conn.fetchrow('''
         INSERT INTO players (user_id, class) 
         VALUES ($1, $2) 
@@ -51,21 +60,40 @@ async def new_player(user: discord.User, conn: asyncpg.Connection, class_name: s
     ''', user.id, class_name)
     return response
 
-@dbExceptionHandler
-async def set_class(user: discord.User, conn: asyncpg.Connection, class_name: str):
+@db_exception_handler
+async def set_class(
+    user: discord.User,
+    class_name: str,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     await conn.execute('''
         UPDATE players 
         SET class = $1 
         WHERE user_id = $2
     ''', class_name, user.id)
 
-@dbExceptionHandler
-async def fetch_player(user: discord.User, conn: asyncpg.Connection):
+@db_exception_handler
+async def fetch_player(
+    user: discord.User,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     player = await conn.fetchrow('SELECT * FROM players WHERE user_id = $1', user.id)
     return player
 
-@dbExceptionHandler
-async def fetch_equipment(user: discord.User, conn: asyncpg.Connection):
+@db_exception_handler
+async def fetch_equipment(
+    user: discord.User,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     records = await conn.fetch('''
         SELECT i.* 
         FROM run_equipment e
@@ -164,8 +192,16 @@ def with_player_context(func):
         
     return wrapper
 
-@dbExceptionHandler
-async def update_xp(user: discord.User, conn: asyncpg.Connection, xp: int, levelup: int = 0):
+@db_exception_handler
+async def update_xp(
+    user: discord.User,
+    xp: int,
+    levelup: int = 0,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     await conn.execute('''
         UPDATE runs
         SET xp = $2
@@ -181,8 +217,15 @@ async def update_xp(user: discord.User, conn: asyncpg.Connection, xp: int, level
 
     return None
 
-@dbExceptionHandler
-async def update_relic(user: discord.User, conn: asyncpg.Connection, relic: int):
+@db_exception_handler
+async def update_relic(
+    user: discord.User,
+    relic: int,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     await conn.execute('''
         UPDATE players
         SET relic = relic + $1
@@ -191,8 +234,15 @@ async def update_relic(user: discord.User, conn: asyncpg.Connection, relic: int)
 
     return None
 
-@dbExceptionHandler
-async def startrun(user: discord.User, conn: asyncpg.Connection, hp: int):
+@db_exception_handler
+async def startrun(
+    user: discord.User,
+    hp: int,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     response = await conn.fetchrow('''
         INSERT INTO runs (user_id, hp, rank_snapshot)
         SELECT $1, $2, rank
@@ -203,14 +253,26 @@ async def startrun(user: discord.User, conn: asyncpg.Connection, hp: int):
     ''', user.id, hp)
     return response
 
-@dbExceptionHandler
-async def fetchrun(user: discord.User, conn: asyncpg.Connection):
+@db_exception_handler
+async def fetchrun(
+    user: discord.User,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     run = await conn.fetchrow('SELECT * FROM runs WHERE user_id = $1', user.id)
 
     return run
 
-@dbExceptionHandler
-async def endrun(user: discord.User, conn: asyncpg.Connection):
+@db_exception_handler
+async def endrun(
+    user: discord.User,
+    *,
+    conn: asyncpg.Connection | None = None
+):
+    if conn is None:
+        raise RuntimeError("Database connection was not provided.")
     await conn.fetchrow('DELETE FROM runs WHERE user_id = $1', user.id)
 
     return None
