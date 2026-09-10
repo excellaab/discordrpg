@@ -26,6 +26,9 @@ class Main(commands.Bot):
         super().__init__(command_prefix="!", intents=discord.Intents.all())
 
     async def setup_hook(self):
+        if database_url is None:
+            raise RuntimeError("Database URL is not set.")
+
         try:
             db.dbpool = await asyncpg.create_pool(database_url, init=db.init_db)
             dblogger.info("Database pool created successfully.")

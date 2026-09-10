@@ -5,7 +5,6 @@ from core.data.classes import CLASSES
 from core.ui.class_select import ClassSelectView
 
 
-
 class Character(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
