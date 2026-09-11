@@ -30,6 +30,7 @@ class Main(commands.Bot):
             raise RuntimeError("Database URL is not set.")
 
         try:
+            # noinspection PyTypeChecker
             db.dbpool = await asyncpg.create_pool(database_url, init=db.init_db)
             dblogger.info("Database pool created successfully.")
         except Exception as e:
@@ -68,6 +69,7 @@ async def on_command_error(ctx, error):
 @bot.command(aliases=['r'])
 @commands.is_owner()
 async def reload(ctx):
+    extension = "<unknown>"
     try:
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py"):
